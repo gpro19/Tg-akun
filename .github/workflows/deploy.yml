@@ -1,0 +1,79 @@
+name: Deploy Worker ke 12 Akun
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  deploy-all:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - nomor: "1"
+            token: "cfat_of5jiDXBLjB9WrXaUqJpPKYEyuAyeNKAmFL7hvOw0beb98a6"
+            id_akun: "3c94a69361b69d81b49df5a2fb732018"
+          
+          - nomor: "2"
+            token: "isi_token_akun_2_disini"
+            id_akun: "isi_id_akun_2_disini"
+            
+          - nomor: "3"
+            token: "isi_token_akun_3_disini"
+            id_akun: "isi_id_akun_3_disini"
+            
+          - nomor: "4"
+            token: "isi_token_akun_4_disini"
+            id_akun: "isi_id_akun_4_disini"
+            
+          - nomor: "5"
+            token: "isi_token_akun_5_disini"
+            id_akun: "isi_id_akun_5_disini"
+            
+          - nomor: "6"
+            token: "isi_token_akun_6_disini"
+            id_akun: "isi_id_akun_6_disini"
+            
+          - nomor: "7"
+            token: "isi_token_akun_7_disini"
+            id_akun: "isi_id_akun_7_disini"
+            
+          - nomor: "8"
+            token: "isi_token_akun_8_disini"
+            id_akun: "isi_id_akun_8_disini"
+            
+          - nomor: "9"
+            token: "isi_token_akun_9_disini"
+            id_akun: "isi_id_akun_9_disini"
+            
+          - nomor: "10"
+            token: "isi_token_akun_10_disini"
+            id_akun: "isi_id_akun_10_disini"
+            
+          - nomor: "11"
+            token: "isi_token_akun_11_disini"
+            id_akun: "isi_id_akun_11_disini"
+            
+          - nomor: "12"
+            token: "isi_token_akun_12_disini"
+            id_akun: "isi_id_akun_12_disini"
+
+    name: Deploy ke Cloudflare Akun ${{ matrix.nomor }}
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Deploy Worker via Wrangler
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ matrix.token }}
+          accountId: ${{ matrix.id_akun }}
+          command: deploy
