@@ -1,79 +1,152 @@
-name: Deploy Worker ke 12 Akun
+
+name: Deploy Worker ke 12 Akun Cloudflare
 
 on:
   push:
     branches:
       - main
+
   workflow_dispatch:
 
+# Hak akses minimum GitHub Actions
+permissions:
+  contents: read
+
+# Mencegah dua workflow deployment berjalan bersamaan
+concurrency:
+  group: cloudflare-production-deployment
+  cancel-in-progress: false
+
 jobs:
-  deploy-all:
+  deploy:
+    name: Deploy Akun ${{ matrix.nomor }}
+
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+
     strategy:
       fail-fast: false
+      max-parallel: 4
+
       matrix:
         include:
-          - nomor: "1"
-            token: "cfat_of5jiDXBLjB9WrXaUqJpPKYEyuAyeNKAmFL7hvOw0beb98a6"
-            id_akun: "3c94a69361b69d81b49df5a2fb732018"
-          
-          - nomor: "2"
-            token: "isi_token_akun_2_disini"
-            id_akun: "isi_id_akun_2_disini"
-            
-          - nomor: "3"
-            token: "isi_token_akun_3_disini"
-            id_akun: "isi_id_akun_3_disini"
-            
-          - nomor: "4"
-            token: "isi_token_akun_4_disini"
-            id_akun: "isi_id_akun_4_disini"
-            
-          - nomor: "5"
-            token: "isi_token_akun_5_disini"
-            id_akun: "isi_id_akun_5_disini"
-            
-          - nomor: "6"
-            token: "isi_token_akun_6_disini"
-            id_akun: "isi_id_akun_6_disini"
-            
-          - nomor: "7"
-            token: "isi_token_akun_7_disini"
-            id_akun: "isi_id_akun_7_disini"
-            
-          - nomor: "8"
-            token: "isi_token_akun_8_disini"
-            id_akun: "isi_id_akun_8_disini"
-            
-          - nomor: "9"
-            token: "isi_token_akun_9_disini"
-            id_akun: "isi_id_akun_9_disini"
-            
+          - nomor: "01"
+            token_secret: cfat_of5jiDXBLjB9WrXaUqJpPKYEyuAyeNKAmFL7hvOw0beb98a6
+            account_var: 3c94a69361b69d81b49df5a2fb732018
+
+          - nomor: "02"
+            token_secret: CF_API_TOKEN_02
+            account_var: CF_ACCOUNT_ID_02
+
+          - nomor: "03"
+            token_secret: CF_API_TOKEN_03
+            account_var: CF_ACCOUNT_ID_03
+
+          - nomor: "04"
+            token_secret: CF_API_TOKEN_04
+            account_var: CF_ACCOUNT_ID_04
+
+          - nomor: "05"
+            token_secret: CF_API_TOKEN_05
+            account_var: CF_ACCOUNT_ID_05
+
+          - nomor: "06"
+            token_secret: CF_API_TOKEN_06
+            account_var: CF_ACCOUNT_ID_06
+
+          - nomor: "07"
+            token_secret: CF_API_TOKEN_07
+            account_var: CF_ACCOUNT_ID_07
+
+          - nomor: "08"
+            token_secret: CF_API_TOKEN_08
+            account_var: CF_ACCOUNT_ID_08
+
+          - nomor: "09"
+            token_secret: CF_API_TOKEN_09
+            account_var: CF_ACCOUNT_ID_09
+
           - nomor: "10"
-            token: "isi_token_akun_10_disini"
-            id_akun: "isi_id_akun_10_disini"
-            
+            token_secret: CF_API_TOKEN_10
+            account_var: CF_ACCOUNT_ID_10
+
           - nomor: "11"
-            token: "isi_token_akun_11_disini"
-            id_akun: "isi_id_akun_11_disini"
-            
+            token_secret: CF_API_TOKEN_11
+            account_var: CF_ACCOUNT_ID_11
+
           - nomor: "12"
-            token: "isi_token_akun_12_disini"
-            id_akun: "isi_id_akun_12_disini"
+            token_secret: CF_API_TOKEN_12
+            account_var: CF_ACCOUNT_ID_12
 
-    name: Deploy ke Cloudflare Akun ${{ matrix.nomor }}
     steps:
+
+      # 1. Checkout source code
       - name: Checkout Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
+      # 2. Setup Node.js
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
-          node-version: 20
+          node-version: 24
+          cache: npm
 
-      - name: Deploy Worker via Wrangler
-        uses: cloudflare/wrangler-action@v3
+      # 3. Validasi konfigurasi
+      - name: Validate Cloudflare Credentials
+        env:
+          CF_TOKEN: ${{ secrets[matrix.token_secret] }}
+          CF_ACCOUNT_ID: ${{ vars[matrix.account_var] }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ -z "$CF_TOKEN" ]]; then
+            echo "::error::Token akun ${{ matrix.nomor }} belum diatur"
+            exit 1
+          fi
+
+          if [[ ! "$CF_ACCOUNT_ID" =~ ^[a-fA-F0-9]{32}$ ]]; then
+            echo "::error::Account ID akun ${{ matrix.nomor }} tidak valid"
+            exit 1
+          fi
+
+          if [[ ! -f package-lock.json ]]; then
+            echo "::error::package-lock.json tidak ditemukan"
+            exit 1
+          fi
+
+          if [[ ! -f wrangler.toml && ! -f wrangler.jsonc && ! -f wrangler.json ]]; then
+            echo "::error::Konfigurasi Wrangler tidak ditemukan"
+            exit 1
+          fi
+
+          echo "Validasi akun ${{ matrix.nomor }} berhasil"
+
+      # 4. Install dependencies
+      - name: Install Dependencies
+        run: npm ci
+
+      # 5. Build project jika tersedia
+      - name: Build Worker
+        run: npm run build --if-present
+
+      # 6. Deploy ke Cloudflare
+      - name: Deploy Worker
+        uses: cloudflare/wrangler-action@v4
         with:
-          apiToken: ${{ matrix.token }}
-          accountId: ${{ matrix.id_akun }}
+          apiToken: ${{ secrets[matrix.token_secret] }}
+          accountId: ${{ vars[matrix.account_var] }}
           command: deploy
+          gitHubToken: ${{ secrets.GITHUB_TOKEN }}
+
+      # 7. Laporan deployment
+      - name: Deployment Summary
+        if: always()
+        env:
+          JOB_STATUS: ${{ job.status }}
+        run: |
+          echo "## Cloudflare Deployment" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Akun: ${{ matrix.nomor }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Status: $JOB_STATUS" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Commit: $GITHUB_SHA" >> "$GITHUB_STEP_SUMMARY"
