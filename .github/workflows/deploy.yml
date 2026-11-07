@@ -17,8 +17,7 @@ concurrency:
 
 jobs:
   deploy:
-    name: Deploy Cloudflare Akun ${{ matrix.nomor }}
-
+    name: Deploy Akun ${{ matrix.nomor }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
@@ -28,29 +27,34 @@ jobs:
 
       matrix:
         include:
-       
           - nomor: "01"
-            token_secret: cfat_of5jiDXBLjB9WrXaUqJpPKYEyuAyeNKAmFL7hvOw0beb98a6
-            account_var: 3c94a69361b69d81b49df5a2fb732018
+            token: "cfat_of5jiDXBLjB9WrXaUqJpPKYEyuAyeNKAmFL7hvOw0beb98a6"
+            account: "3c94a69361b69d81b49df5a2fb732018"
 
-
-        
 
     env:
-      CLOUDFLARE_API_TOKEN: ${{ secrets[matrix.token] }}
-      CLOUDFLARE_ACCOUNT_ID: ${{ vars[matrix.account] }}
+      CLOUDFLARE_API_TOKEN: ${{ matrix.token }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ matrix.account }}
 
     steps:
+      # Checkout repository
       - name: Checkout Repository
         uses: actions/checkout@v6
 
+      # Setup Node.js tanpa cache npm
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+
+      # Validasi konfigurasi
       - name: Validate Configuration
         shell: bash
         run: |
           set -euo pipefail
 
-          if [[ -z "$CLOUDFLARE_API_TOKEN" ]]; then
-            echo "::error::Token akun ${{ matrix.nomor }} belum tersedia"
+          if [[ "$CLOUDFLARE_API_TOKEN" == MASUKKAN_* ]] || [[ -z "$CLOUDFLARE_API_TOKEN" ]]; then
+            echo "::error::Token akun ${{ matrix.nomor }} belum diisi"
             exit 1
           fi
 
@@ -68,26 +72,35 @@ jobs:
 
           echo "Validasi akun berhasil"
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v7
-        with:
-          node-version: 24
-
+      # Install Wrangler
       - name: Install Wrangler
         run: npm install --global wrangler@4
 
+      # Periksa Wrangler
       - name: Check Wrangler
         run: wrangler --version
 
+      # Deploy dengan retry
       - name: Deploy Worker
         shell: bash
         run: |
           set -euo pipefail
 
-          for attempt in 1 2 3; do
-            echo "Deploy akun ${{ matrix.nomor }} - percobaan $attempt"
+          CONFIG=""
 
-            if wrangler deploy; then
+          if [[ -f wrangler.toml ]]; then
+            CONFIG="wrangler.toml"
+          elif [[ -f wrangler.jsonc ]]; then
+            CONFIG="wrangler.jsonc"
+          else
+            CONFIG="wrangler.json"
+          fi
+
+          for attempt in 1 2 3; do
+            echo "Deploy akun ${{ matrix.nomor }}"
+            echo "Percobaan $attempt dari 3"
+
+            if wrangler deploy --config "$CONFIG"; then
               echo "Deployment berhasil"
               exit 0
             fi
@@ -97,9 +110,10 @@ jobs:
             fi
           done
 
-          echo "::error::Deployment gagal setelah 3 percobaan"
+          echo "::error::Deployment akun ${{ matrix.nomor }} gagal"
           exit 1
 
+      # Laporan
       - name: Deployment Summary
         if: always()
         env:
